@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:8006",
         description="URL for fm-knowledge-service",
     )
+    fm_agent_service_url: str = Field(
+        default="http://127.0.0.1:8007",
+        description="URL for fm-agent-service",
+    )
 
     # Gateway Configuration
     gateway_host: str = Field(

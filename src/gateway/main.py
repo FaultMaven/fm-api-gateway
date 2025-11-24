@@ -21,6 +21,7 @@ from .core.auth_provider import IAuthProvider
 from .infrastructure import FMAuthProvider, SupabaseProvider
 from .api.middleware import AuthMiddleware
 from .api.routes import router, proxy_request
+from .api.openapi_aggregator import OpenAPIAggregator
 
 # Configure logging
 logging.basicConfig(
@@ -55,12 +56,27 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
 
-    # Create FastAPI app
+    # Initialize OpenAPI aggregator
+    aggregator = OpenAPIAggregator({
+        "auth": settings.fm_auth_service_url,
+        "session": settings.fm_session_service_url,
+        "case": settings.fm_case_service_url,
+        "evidence": settings.fm_evidence_service_url,
+        "investigation": settings.fm_investigation_service_url,
+        "knowledge": settings.fm_knowledge_service_url,
+        "agent": settings.fm_agent_service_url,
+    })
+
+    # Create FastAPI app with custom OpenAPI endpoint
     app = FastAPI(
         title="FaultMaven API Gateway",
         description="Hybrid Gateway + Auth Adapter Pattern",
         version="1.0.0",
         lifespan=lifespan,
+        # Disable default OpenAPI docs - we'll use aggregated version
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
     )
 
     # Configure CORS
@@ -77,6 +93,30 @@ def create_app() -> FastAPI:
 
     # Add authentication middleware
     app.add_middleware(AuthMiddleware, auth_provider=auth_provider)
+
+    # Add custom OpenAPI endpoints
+    @app.get("/openapi.json", include_in_schema=False)
+    async def get_unified_openapi():
+        """Get unified OpenAPI specification from all microservices"""
+        return await aggregator.get_unified_spec()
+
+    @app.get("/docs", include_in_schema=False)
+    async def get_unified_docs():
+        """Swagger UI for unified API documentation"""
+        from fastapi.openapi.docs import get_swagger_ui_html
+        return get_swagger_ui_html(
+            openapi_url="/openapi.json",
+            title="FaultMaven API - Unified Documentation",
+        )
+
+    @app.get("/redoc", include_in_schema=False)
+    async def get_unified_redoc():
+        """ReDoc UI for unified API documentation"""
+        from fastapi.openapi.docs import get_redoc_html
+        return get_redoc_html(
+            openapi_url="/openapi.json",
+            title="FaultMaven API - Unified Documentation",
+        )
 
     # Include health check route
     app.include_router(router)
@@ -277,7 +317,33 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
             path="/api/v1/solutions",
         )
 
-    logger.info("Configured proxy routes for auth, session, cases, evidence, and investigation services")
+    # Route: /api/v1/knowledge/* -> fm-knowledge-service
+    @app.api_route(
+        "/api/v1/knowledge/{path:path}",
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    )
+    async def proxy_knowledge(request: Request, path: str):
+        """Proxy knowledge requests to fm-knowledge-service"""
+        return await proxy_request(
+            request,
+            backend_url=settings.fm_knowledge_service_url,
+            path=f"/api/v1/knowledge/{path}",
+        )
+
+    # Route: /api/v1/knowledge (no path) -> fm-knowledge-service
+    @app.api_route(
+        "/api/v1/knowledge",
+        methods=["GET", "POST"],
+    )
+    async def proxy_knowledge_root(request: Request):
+        """Proxy knowledge requests to fm-knowledge-service"""
+        return await proxy_request(
+            request,
+            backend_url=settings.fm_knowledge_service_url,
+            path="/api/v1/knowledge",
+        )
+
+    logger.info("Configured proxy routes for auth, session, cases, evidence, investigation, and knowledge services")
 
 
 # Create app instance
