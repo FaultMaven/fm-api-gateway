@@ -141,6 +141,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/login",
             "/api/v1/auth/dev-login",
             "/api/v1/auth/register",
+            "/api/v1/auth/dev-register",
             "/api/v1/auth/refresh",
         ]
         return any(path.startswith(prefix) for prefix in public_paths)
