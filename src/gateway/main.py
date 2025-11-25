@@ -177,7 +177,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/auth/* -> fm-auth-service
     @app.api_route(
         "/api/v1/auth/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_auth(request: Request, path: str):
         """Proxy authentication requests to fm-auth-service"""
@@ -190,7 +190,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/sessions/* -> fm-session-service
     @app.api_route(
         "/api/v1/sessions/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_sessions(request: Request, path: str):
         """Proxy session requests to fm-session-service"""
@@ -203,7 +203,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/sessions (no path) -> fm-session-service
     @app.api_route(
         "/api/v1/sessions",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_sessions_root(request: Request):
         """Proxy session list/create requests to fm-session-service"""
@@ -216,7 +216,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/cases/* -> fm-case-service
     @app.api_route(
         "/api/v1/cases/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_cases(request: Request, path: str):
         """Proxy case requests to fm-case-service"""
@@ -229,7 +229,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/cases (no path) -> fm-case-service
     @app.api_route(
         "/api/v1/cases",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_cases_root(request: Request):
         """Proxy case list/create requests to fm-case-service"""
@@ -242,7 +242,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/evidence/* -> fm-evidence-service
     @app.api_route(
         "/api/v1/evidence/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_evidence(request: Request, path: str):
         """Proxy evidence requests to fm-evidence-service"""
@@ -255,7 +255,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/evidence (no path) -> fm-evidence-service
     @app.api_route(
         "/api/v1/evidence",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_evidence_root(request: Request):
         """Proxy evidence list/upload requests to fm-evidence-service"""
@@ -268,7 +268,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/hypotheses/* -> fm-investigation-service
     @app.api_route(
         "/api/v1/hypotheses/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_hypotheses(request: Request, path: str):
         """Proxy hypothesis requests to fm-investigation-service"""
@@ -281,7 +281,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/hypotheses (no path) -> fm-investigation-service
     @app.api_route(
         "/api/v1/hypotheses",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_hypotheses_root(request: Request):
         """Proxy hypothesis list/create requests to fm-investigation-service"""
@@ -294,7 +294,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/solutions/* -> fm-investigation-service
     @app.api_route(
         "/api/v1/solutions/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_solutions(request: Request, path: str):
         """Proxy solution requests to fm-investigation-service"""
@@ -307,7 +307,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/solutions (no path) -> fm-investigation-service
     @app.api_route(
         "/api/v1/solutions",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_solutions_root(request: Request):
         """Proxy solution list/create requests to fm-investigation-service"""
@@ -320,7 +320,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/knowledge/* -> fm-knowledge-service
     @app.api_route(
         "/api/v1/knowledge/{path:path}",
-        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_knowledge(request: Request, path: str):
         """Proxy knowledge requests to fm-knowledge-service"""
@@ -333,7 +333,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
     # Route: /api/v1/knowledge (no path) -> fm-knowledge-service
     @app.api_route(
         "/api/v1/knowledge",
-        methods=["GET", "POST"],
+        methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_knowledge_root(request: Request):
         """Proxy knowledge requests to fm-knowledge-service"""
