@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..core.auth_provider import IAuthProvider
+from ..core.user_context import UserContext
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     2. Validates JWT tokens using configured auth provider
     3. Adds validated X-User-* headers for downstream services
     4. Allows unauthenticated access to /health and /auth/* endpoints
+    5. Supports optional authentication (if configured) for self-hosted mode
 
     Flow:
     1. Extract Authorization header
@@ -29,19 +31,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
     5. Forward to backend service
     """
 
-    def __init__(self, app, auth_provider: IAuthProvider):
+    def __init__(self, app, auth_provider: IAuthProvider, settings=None):
         """
         Initialize authentication middleware.
 
         Args:
             app: FastAPI application
             auth_provider: Authentication provider implementation (IAuthProvider)
+            settings: Application settings (optional)
         """
         super().__init__(app)
         self.auth_provider = auth_provider
+        self.settings = settings
+        
+        # Determine auth mode
+        self.auth_required = True
+        if settings and hasattr(settings, "auth_required"):
+            self.auth_required = settings.auth_required
+            
         logger.info(
-            f"Initialized AuthMiddleware with provider: "
-            f"{auth_provider.get_provider_name()}"
+            f"Initialized AuthMiddleware with provider: {auth_provider.get_provider_name()}, "
+            f"Auth Required: {self.auth_required}"
         )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -62,59 +72,77 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Extract Authorization header
         auth_header = request.headers.get("Authorization")
+        user_context = None
+        
+        # Case 1: No auth header provided
         if not auth_header:
-            logger.warning(f"Missing Authorization header for {request.url.path}")
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={
-                    "error": "missing_authorization",
-                    "message": "Authorization header is required",
-                },
-            )
+            if self.auth_required:
+                logger.warning(f"Missing Authorization header for {request.url.path}")
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={
+                        "error": "missing_authorization",
+                        "message": "Authorization header is required",
+                    },
+                )
+            else:
+                # Auth is optional -> use anonymous user
+                logger.info(f"Allowing anonymous access to {request.url.path}")
+                user_context = self._create_anonymous_user()
 
-        # Extract token from "Bearer <token>"
-        try:
-            token = self._extract_bearer_token(auth_header)
-        except ValueError as e:
-            logger.warning(f"Invalid Authorization header format: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={
-                    "error": "invalid_authorization_format",
-                    "message": str(e),
-                },
-            )
-
-        # Validate token and extract user context
-        try:
-            user_context = await self.auth_provider.validate_token(token)
-        except ValueError as e:
-            logger.warning(f"Token validation failed: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={
-                    "error": "invalid_token",
-                    "message": str(e),
-                },
-            )
+        # Case 2: Auth header provided
+        else:
+            # Extract token from "Bearer <token>"
+            try:
+                token = self._extract_bearer_token(auth_header)
+                # Validate token and extract user context
+                user_context = await self.auth_provider.validate_token(token)
+            except ValueError as e:
+                logger.warning(f"Token validation failed: {str(e)}")
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={
+                        "error": "invalid_token",
+                        "message": str(e),
+                    },
+                )
 
         # Strip client-provided X-User-* headers (security!)
         self._strip_client_user_headers(request)
 
-        # Add validated user headers
-        validated_headers = user_context.to_headers()
-        for header_name, header_value in validated_headers.items():
-            request.state.user_headers = getattr(request.state, "user_headers", {})
-            request.state.user_headers[header_name] = header_value
+        # Add validated user headers (from either token or anonymous context)
+        if user_context:
+            validated_headers = user_context.to_headers()
+            for header_name, header_value in validated_headers.items():
+                request.state.user_headers = getattr(request.state, "user_headers", {})
+                request.state.user_headers[header_name] = header_value
 
-        logger.info(
-            f"Authenticated user {user_context.user_id} for {request.method} "
-            f"{request.url.path}"
-        )
+            logger.info(
+                f"Authenticated user {user_context.user_id} for {request.method} "
+                f"{request.url.path}"
+            )
 
         # Forward to next handler
         response = await call_next(request)
         return response
+
+    def _create_anonymous_user(self) -> UserContext:
+        """Create a default anonymous user context."""
+        if self.settings:
+            return UserContext(
+                user_id=self.settings.anonymous_user_id,
+                email=self.settings.anonymous_user_email,
+                roles=[self.settings.anonymous_user_role],
+                email_verified=True,
+            )
+        else:
+            # Fallback defaults
+            return UserContext(
+                user_id="anonymous",
+                email="anonymous@example.com",
+                roles=["admin"],
+                email_verified=True,
+            )
 
     def _is_public_endpoint(self, path: str) -> bool:
         """

@@ -92,7 +92,7 @@ def create_app() -> FastAPI:
     auth_provider = _create_auth_provider(settings)
 
     # Add authentication middleware
-    app.add_middleware(AuthMiddleware, auth_provider=auth_provider)
+    app.add_middleware(AuthMiddleware, auth_provider=auth_provider, settings=settings)
 
     # Add custom OpenAPI endpoints
     @app.get("/openapi.json", include_in_schema=False)

@@ -79,6 +79,24 @@ class Settings(BaseSettings):
         description="JWK cache TTL in seconds (5 minutes)",
     )
 
+    # Authentication Configuration
+    auth_required: bool = Field(
+        default=True,
+        description="Whether to enforce authentication. Set to False for self-hosted mode.",
+    )
+    anonymous_user_id: str = Field(
+        default="anonymous_admin",
+        description="User ID to use when auth is optional and no token is provided",
+    )
+    anonymous_user_email: str = Field(
+        default="admin@example.com",
+        description="Email to use when auth is optional and no token is provided",
+    )
+    anonymous_user_role: str = Field(
+        default="admin",
+        description="Role to use when auth is optional and no token is provided",
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins into list"""
