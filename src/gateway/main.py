@@ -343,7 +343,33 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
             path="/api/v1/knowledge",
         )
 
-    logger.info("Configured proxy routes for auth, session, cases, evidence, investigation, and knowledge services")
+    # Route: /api/v1/agent/* -> fm-agent-service
+    @app.api_route(
+        "/api/v1/agent/{path:path}",
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    )
+    async def proxy_agent(request: Request, path: str):
+        """Proxy agent requests to fm-agent-service"""
+        return await proxy_request(
+            request,
+            backend_url=settings.fm_agent_service_url,
+            path=f"/api/v1/agent/{path}",
+        )
+
+    # Route: /api/v1/agent (no path) -> fm-agent-service
+    @app.api_route(
+        "/api/v1/agent",
+        methods=["GET", "POST", "OPTIONS"],
+    )
+    async def proxy_agent_root(request: Request):
+        """Proxy agent requests to fm-agent-service"""
+        return await proxy_request(
+            request,
+            backend_url=settings.fm_agent_service_url,
+            path="/api/v1/agent",
+        )
+
+    logger.info("Configured proxy routes for auth, session, cases, evidence, investigation, knowledge, and agent services")
 
 
 # Create app instance
