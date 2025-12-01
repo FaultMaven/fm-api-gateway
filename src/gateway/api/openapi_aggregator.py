@@ -80,7 +80,7 @@ class OpenAPIAggregator:
                 "version": "2.0.0",
                 "contact": {
                     "name": "FaultMaven",
-                    "url": "https://github.com/FaultMaven/FaultMaven",
+                    "url": "https://github.com/FaultMaven/faultmaven",
                 },
                 "license": {
                     "name": "Apache 2.0",
