@@ -1,5 +1,8 @@
 # fm-api-gateway
 
+> **Part of [FaultMaven](https://github.com/FaultMaven/faultmaven)** —
+> The AI-Powered Troubleshooting Copilot
+
 **FaultMaven API Gateway** - Open source request routing with pluggable authentication.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -44,6 +47,25 @@ docker run -d -p 8090:8090 \
 - `/api/v1/sessions/*` → fm-session-service
 - `/api/v1/documents/*` → fm-knowledge-service
 - `/api/v1/evidence/*` → fm-evidence-service
+
+## Contributing
+
+See our [Contributing Guide](https://github.com/FaultMaven/.github/blob/main/CONTRIBUTING.md) for detailed guidelines.
+
+## Support
+
+- **Discussions:** [GitHub Discussions](https://github.com/FaultMaven/faultmaven/discussions)
+- **Issues:** [GitHub Issues](https://github.com/FaultMaven/fm-api-gateway/issues)
+
+## Related Projects
+
+- **[faultmaven](https://github.com/FaultMaven/faultmaven)** - Main repository and documentation
+- **[faultmaven-deploy](https://github.com/FaultMaven/faultmaven-deploy)** - Deployment configurations
+- **[fm-auth-service](https://github.com/FaultMaven/fm-auth-service)** - Authentication service
+- **[fm-case-service](https://github.com/FaultMaven/fm-case-service)** - Case management service
+- **[fm-session-service](https://github.com/FaultMaven/fm-session-service)** - Session management service
+- **[fm-knowledge-service](https://github.com/FaultMaven/fm-knowledge-service)** - Knowledge base service
+- **[fm-evidence-service](https://github.com/FaultMaven/fm-evidence-service)** - Evidence management service
 
 ## License
 
