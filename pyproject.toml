@@ -12,6 +12,10 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "python-dotenv>=1.0.0",
+    # Redis for rate limiting and circuit breakers
+    "redis>=5.0.0",
+    # FaultMaven Core Library (service discovery, shared models)
+    "fm-core-lib @ git+https://github.com/FaultMaven/fm-core-lib.git@main",
 ]
 
 [project.optional-dependencies]

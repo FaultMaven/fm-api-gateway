@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .core.auth_provider import IAuthProvider
 from .infrastructure import FMAuthProvider, SupabaseProvider
-from .api.middleware import AuthMiddleware
+from .api.middleware import AuthMiddleware, RateLimitMiddleware
 from .api.routes import router, proxy_request
 from .api.openapi_aggregator import OpenAPIAggregator
 
@@ -56,15 +56,15 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
 
-    # Initialize OpenAPI aggregator
+    # Initialize OpenAPI aggregator using ServiceRegistry
     aggregator = OpenAPIAggregator({
-        "auth": settings.fm_auth_service_url,
-        "session": settings.fm_session_service_url,
-        "case": settings.fm_case_service_url,
-        "evidence": settings.fm_evidence_service_url,
-        "investigation": settings.fm_investigation_service_url,
-        "knowledge": settings.fm_knowledge_service_url,
-        "agent": settings.fm_agent_service_url,
+        "auth": settings.get_service_url("auth"),
+        "session": settings.get_service_url("session"),
+        "case": settings.get_service_url("case"),
+        "evidence": settings.get_service_url("evidence"),
+        "investigation": settings.get_service_url("investigation"),
+        "knowledge": settings.get_service_url("knowledge"),
+        "agent": settings.get_service_url("agent"),
     })
 
     # Create FastAPI app with custom OpenAPI endpoint
@@ -90,6 +90,9 @@ def create_app() -> FastAPI:
 
     # Initialize auth provider based on configuration
     auth_provider = _create_auth_provider(settings)
+
+    # Add rate limiting middleware (runs BEFORE auth)
+    app.add_middleware(RateLimitMiddleware)
 
     # Add authentication middleware
     app.add_middleware(AuthMiddleware, auth_provider=auth_provider, settings=settings)
@@ -143,7 +146,7 @@ def _create_auth_provider(settings) -> IAuthProvider:
     if settings.primary_auth_provider == "fm-auth-service":
         logger.info("Using fm-auth-service provider")
         return FMAuthProvider(
-            service_url=settings.fm_auth_service_url,
+            service_url=settings.get_service_url("auth"),
             cache_ttl=settings.jwk_cache_ttl,
         )
     elif settings.primary_auth_provider == "supabase":
@@ -183,7 +186,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy authentication requests to fm-auth-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_auth_service_url,
+            backend_url=settings.get_service_url("auth"),
             path=f"/api/v1/auth/{path}",
         )
 
@@ -196,7 +199,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy session requests to fm-session-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_session_service_url,
+            backend_url=settings.get_service_url("session"),
             path=f"/api/v1/sessions/{path}",
         )
 
@@ -209,7 +212,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy session list/create requests to fm-session-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_session_service_url,
+            backend_url=settings.get_service_url("session"),
             path="/api/v1/sessions",
         )
 
@@ -222,7 +225,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy case requests to fm-case-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_case_service_url,
+            backend_url=settings.get_service_url("case"),
             path=f"/api/v1/cases/{path}",
         )
 
@@ -235,7 +238,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy case list/create requests to fm-case-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_case_service_url,
+            backend_url=settings.get_service_url("case"),
             path="/api/v1/cases",
         )
 
@@ -248,7 +251,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy evidence requests to fm-evidence-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_evidence_service_url,
+            backend_url=settings.get_service_url("evidence"),
             path=f"/api/v1/evidence/{path}",
         )
 
@@ -261,7 +264,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy evidence list/upload requests to fm-evidence-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_evidence_service_url,
+            backend_url=settings.get_service_url("evidence"),
             path="/api/v1/evidence",
         )
 
@@ -274,7 +277,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy hypothesis requests to fm-investigation-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_investigation_service_url,
+            backend_url=settings.get_service_url("investigation"),
             path=f"/api/v1/hypotheses/{path}",
         )
 
@@ -287,7 +290,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy hypothesis list/create requests to fm-investigation-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_investigation_service_url,
+            backend_url=settings.get_service_url("investigation"),
             path="/api/v1/hypotheses",
         )
 
@@ -300,7 +303,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy solution requests to fm-investigation-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_investigation_service_url,
+            backend_url=settings.get_service_url("investigation"),
             path=f"/api/v1/solutions/{path}",
         )
 
@@ -313,7 +316,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy solution list/create requests to fm-investigation-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_investigation_service_url,
+            backend_url=settings.get_service_url("investigation"),
             path="/api/v1/solutions",
         )
 
@@ -326,7 +329,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy knowledge requests to fm-knowledge-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_knowledge_service_url,
+            backend_url=settings.get_service_url("knowledge"),
             path=f"/api/v1/knowledge/{path}",
         )
 
@@ -339,7 +342,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy knowledge requests to fm-knowledge-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_knowledge_service_url,
+            backend_url=settings.get_service_url("knowledge"),
             path="/api/v1/knowledge",
         )
 
@@ -352,7 +355,7 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy agent requests to fm-agent-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_agent_service_url,
+            backend_url=settings.get_service_url("agent"),
             path=f"/api/v1/agent/{path}",
         )
 
@@ -365,11 +368,11 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
         """Proxy agent requests to fm-agent-service"""
         return await proxy_request(
             request,
-            backend_url=settings.fm_agent_service_url,
+            backend_url=settings.get_service_url("agent"),
             path="/api/v1/agent",
         )
 
-    logger.info("Configured proxy routes for auth, session, cases, evidence, investigation, knowledge, and agent services")
+    logger.info("Configured proxy routes using ServiceRegistry for deployment-neutral service discovery")
 
 
 # Create app instance

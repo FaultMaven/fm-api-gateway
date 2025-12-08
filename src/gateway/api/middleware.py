@@ -1,4 +1,4 @@
-"""Authentication middleware for JWT validation and header injection"""
+"""Authentication and rate limiting middleware"""
 
 import logging
 from typing import Callable
@@ -8,6 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..core.auth_provider import IAuthProvider
 from ..core.user_context import UserContext
+from ..core.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -226,3 +227,99 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.warning(
                 f"Client attempted header injection with: {headers_to_remove}"
             )
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Rate limiting middleware using Redis or in-memory backend.
+
+    Features:
+    - Per-IP rate limiting
+    - Redis-backed (distributed across gateway pods)
+    - In-memory fallback (if Redis unavailable)
+    - Graceful degradation (fail-open on errors)
+    - Standard HTTP headers (X-RateLimit-*)
+
+    Exemptions:
+    - /health endpoint (for K8s probes)
+    """
+
+    def __init__(self, app):
+        """Initialize rate limit middleware."""
+        super().__init__(app)
+        self.rate_limiter = get_rate_limiter()
+        logger.info("Initialized RateLimitMiddleware")
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """
+        Check rate limit before processing request.
+
+        Args:
+            request: Incoming HTTP request
+            call_next: Next middleware/handler in chain
+
+        Returns:
+            Response or 429 Too Many Requests
+        """
+        # Skip rate limiting for health checks
+        if request.url.path == "/health":
+            return await call_next(request)
+
+        # Get client identifier (IP address)
+        client_ip = self._get_client_ip(request)
+
+        # Check rate limit
+        is_allowed, headers = self.rate_limiter.is_allowed(client_ip)
+
+        if not is_allowed:
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={
+                    "error": "rate_limit_exceeded",
+                    "message": "Too many requests. Please try again later.",
+                },
+                headers=headers,
+            )
+
+        # Continue to next handler
+        response = await call_next(request)
+
+        # Add rate limit headers to response
+        for header_name, header_value in headers.items():
+            response.headers[header_name] = header_value
+
+        return response
+
+    def _get_client_ip(self, request: Request) -> str:
+        """
+        Extract client IP address from request.
+
+        Checks in order:
+        1. X-Forwarded-For (if behind proxy/load balancer)
+        2. X-Real-IP (nginx)
+        3. request.client.host (direct connection)
+
+        Args:
+            request: Incoming request
+
+        Returns:
+            Client IP address
+        """
+        # Check X-Forwarded-For (load balancer)
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # Take first IP (client)
+            return forwarded_for.split(",")[0].strip()
+
+        # Check X-Real-IP (nginx)
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip
+
+        # Direct connection
+        if request.client:
+            return request.client.host
+
+        # Fallback
+        return "unknown"

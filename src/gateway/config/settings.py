@@ -1,8 +1,9 @@
 """Gateway configuration using pydantic-settings"""
 
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from fm_core_lib.discovery import get_service_registry, ServiceRegistry
 
 
 class Settings(BaseSettings):
@@ -21,35 +22,76 @@ class Settings(BaseSettings):
         description="Primary authentication provider to use",
     )
 
-    # Service URLs
-    fm_auth_service_url: str = Field(
-        default="http://127.0.0.1:8001",
-        description="URL for fm-auth-service",
+    # Service Discovery Configuration
+    deployment_mode: str = Field(
+        default="docker",
+        description="Deployment mode: 'docker', 'kubernetes', or 'local'",
     )
-    fm_session_service_url: str = Field(
-        default="http://127.0.0.1:8002",
-        description="URL for fm-session-service",
+    k8s_namespace: str = Field(
+        default="faultmaven",
+        description="Kubernetes namespace (only used when deployment_mode=kubernetes)",
     )
-    fm_case_service_url: str = Field(
-        default="http://127.0.0.1:8003",
-        description="URL for fm-case-service",
+
+    # Legacy: Manual service URL overrides (deprecated in favor of ServiceRegistry)
+    # These are kept for backward compatibility but ServiceRegistry is preferred
+    fm_auth_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-auth-service (legacy)",
     )
-    fm_evidence_service_url: str = Field(
-        default="http://127.0.0.1:8004",
-        description="URL for fm-evidence-service",
+    fm_session_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-session-service (legacy)",
     )
-    fm_investigation_service_url: str = Field(
-        default="http://127.0.0.1:8005",
-        description="URL for fm-investigation-service",
+    fm_case_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-case-service (legacy)",
     )
-    fm_knowledge_service_url: str = Field(
-        default="http://127.0.0.1:8006",
-        description="URL for fm-knowledge-service",
+    fm_evidence_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-evidence-service (legacy)",
     )
-    fm_agent_service_url: str = Field(
-        default="http://127.0.0.1:8007",
-        description="URL for fm-agent-service",
+    fm_investigation_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-investigation-service (legacy)",
     )
+    fm_knowledge_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-knowledge-service (legacy)",
+    )
+    fm_agent_service_url: Optional[str] = Field(
+        default=None,
+        description="Override URL for fm-agent-service (legacy)",
+    )
+
+    # Service Registry instance (lazy-initialized)
+    _service_registry: Optional[ServiceRegistry] = None
+
+    def get_service_url(self, service_name: str) -> str:
+        """Get service URL using ServiceRegistry or legacy override.
+
+        Args:
+            service_name: Service name (e.g., "auth", "session", "case")
+
+        Returns:
+            Full service URL
+
+        Example:
+            >>> settings = Settings()
+            >>> settings.get_service_url("auth")
+            'http://fm-auth-service:8000'  # Docker mode
+        """
+        # Check for legacy manual override first
+        override_attr = f"fm_{service_name}_service_url"
+        if hasattr(self, override_attr):
+            override_url = getattr(self, override_attr)
+            if override_url:
+                return override_url
+
+        # Use ServiceRegistry for deployment-neutral URL resolution
+        if self._service_registry is None:
+            self._service_registry = get_service_registry()
+
+        return self._service_registry.get_url(service_name)
 
     # Gateway Configuration
     gateway_host: str = Field(
