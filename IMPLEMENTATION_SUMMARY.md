@@ -486,7 +486,7 @@ async def get_v2_spec():
 
 - **[fm-api-gateway README](../README.md#unified-api-documentation)** - User-facing documentation
 - **[fm-contracts README](../../fm-contracts/README.md)** - Deprecation notice and migration guide
-- **[Migration Impact Summary](../../docs/archive/2025/12/openapi-migration-impact.md)** - Cross-repository impact analysis (archived)
+- **[Migration Impact Summary](../../faultmaven-doc-internal/archive/2025/12/openapi-migration-impact.md)** - Cross-repository impact analysis (archived)
 
 ## References
 
