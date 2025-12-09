@@ -145,6 +145,131 @@ Prevents cascading failures when backend services are unhealthy:
 - `/api/v1/documents/*` → fm-knowledge-service
 - `/api/v1/evidence/*` → fm-evidence-service
 
+## Unified API Documentation
+
+The API Gateway aggregates OpenAPI specifications from all microservices and serves them as a unified spec.
+
+### Accessing Documentation
+
+| Method | URL | Use Case |
+|--------|-----|----------|
+| **Swagger UI** | `http://localhost:8090/docs` | Interactive API testing |
+| **ReDoc UI** | `http://localhost:8090/redoc` | Clean documentation view |
+| **Raw JSON** | `http://localhost:8090/openapi.json` | Programmatic access, code generation |
+
+### For Frontend Developers
+
+Generate TypeScript types from the unified spec:
+
+```bash
+# Fetch spec
+curl http://localhost:8090/openapi.json > openapi.json
+
+# Generate types
+npx openapi-typescript openapi.json -o src/types/api.ts
+```
+
+Import to Postman:
+
+```text
+File → Import → Link → http://localhost:8090/openapi.json
+```
+
+### Generating Locked OpenAPI Spec
+
+For stable API contract reference, generate a locked version:
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Wait for services to be healthy
+sleep 30
+
+# Generate locked spec (bash)
+./scripts/lock-openapi.sh
+
+# OR using Python
+python3 scripts/lock_openapi.py
+
+# Review changes
+git diff docs/api/openapi.locked.yaml
+
+# Commit if stable
+git add docs/api/openapi.locked.yaml
+git commit -m "docs: update locked OpenAPI spec for v2.x.x"
+```
+
+**Options:**
+
+```bash
+# Custom gateway URL
+./scripts/lock-openapi.sh http://production:8090
+
+# Custom output file
+./scripts/lock-openapi.sh http://localhost:8090 docs/api/openapi.locked.production.yaml
+
+# Python with JSON output
+python3 scripts/lock_openapi.py --format json --output docs/api/openapi.locked.json
+```
+
+### Admin Endpoints
+
+**Refresh OpenAPI Cache:**
+
+After deploying a service update, force refresh the unified spec:
+
+```bash
+curl -X POST http://localhost:8090/admin/refresh-openapi
+```
+
+Response:
+
+```json
+{
+  "status": "success",
+  "message": "OpenAPI spec cache cleared. Next request will fetch fresh specs from all services."
+}
+```
+
+**Check OpenAPI Health:**
+
+Verify which services are responding with OpenAPI specs:
+
+```bash
+curl http://localhost:8090/admin/openapi-health
+```
+
+Response:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2.0.0",
+  "aggregation": {
+    "successful_services": ["auth", "session", "case", "knowledge", "evidence", "agent"],
+    "failed_services": [],
+    "total_paths": 47,
+    "total_schemas": 89
+  }
+}
+```
+
+### Breaking Change Protection
+
+The repository includes CI workflows to detect breaking API changes:
+
+- **On Pull Request**: Compares current spec vs locked baseline
+- **On Release**: Auto-generates locked spec from production
+
+If breaking changes are detected:
+
+1. **Bump API version**: Update from v1 → v2
+2. **Update locked spec**: Run `./scripts/lock-openapi.sh`
+3. **Document migration**: Add migration guide to PR
+
+See [API_BREAKING_CHANGES.md](docs/API_BREAKING_CHANGES.md) for details.
+
 ## Contributing
 
 See our [Contributing Guide](https://github.com/FaultMaven/.github/blob/main/CONTRIBUTING.md) for detailed guidelines.

@@ -1,0 +1,168 @@
+name: Detect Breaking API Changes
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**/*.py'
+      - '../fm-auth-service/src/**/*.py'
+      - '../fm-session-service/src/**/*.py'
+      - '../fm-case-service/src/**/*.py'
+      - '../fm-knowledge-service/src/**/*.py'
+      - '../fm-evidence-service/src/**/*.py'
+      - '../fm-agent-service/src/**/*.py'
+
+jobs:
+  breaking-change-detection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install httpx pyyaml
+          npm install -g oasdiff @stoplight/spectral-cli
+
+      - name: Start services (PR branch)
+        run: |
+          # Assuming docker-compose.yml exists in parent directory
+          cd ../
+          docker-compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 45
+
+      - name: Wait for API Gateway health
+        run: |
+          max_attempts=30
+          attempt=0
+          until curl -sf http://localhost:8090/health > /dev/null 2>&1; do
+            attempt=$((attempt + 1))
+            if [ $attempt -ge $max_attempts ]; then
+              echo "API Gateway failed to become healthy after $max_attempts attempts"
+              docker-compose logs fm-api-gateway
+              exit 1
+            fi
+            echo "Waiting for API Gateway... (attempt $attempt/$max_attempts)"
+            sleep 2
+          done
+          echo "API Gateway is healthy"
+
+      - name: Generate current OpenAPI spec
+        run: |
+          python3 scripts/lock_openapi.py \
+            --gateway-url http://localhost:8090 \
+            --output /tmp/current-spec.yaml \
+            --format yaml
+
+      - name: Fetch baseline spec from main branch
+        run: |
+          # If locked spec doesn't exist yet, create empty baseline
+          if [ -f docs/api/openapi.locked.yaml ]; then
+            cp docs/api/openapi.locked.yaml /tmp/baseline-spec.yaml
+          else
+            echo "No locked spec found - creating empty baseline"
+            echo "openapi: 3.1.0
+info:
+  title: Empty Baseline
+  version: 1.0.0
+paths: {}" > /tmp/baseline-spec.yaml
+          fi
+
+      - name: Detect breaking changes
+        id: breaking_changes
+        continue-on-error: true
+        run: |
+          echo "Comparing baseline vs current spec..."
+          oasdiff breaking /tmp/baseline-spec.yaml /tmp/current-spec.yaml \
+            --format text \
+            --fail-on-diff > /tmp/breaking-changes.txt 2>&1
+          exit_code=$?
+
+          if [ $exit_code -eq 0 ]; then
+            echo "No breaking changes detected"
+            echo "has_breaking_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Breaking changes detected!"
+            echo "has_breaking_changes=true" >> $GITHUB_OUTPUT
+            cat /tmp/breaking-changes.txt
+          fi
+
+          exit $exit_code
+
+      - name: Comment on PR with breaking changes
+        if: steps.breaking_changes.outputs.has_breaking_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const breakingChanges = fs.readFileSync('/tmp/breaking-changes.txt', 'utf8');
+
+            const comment = `## 🚨 Breaking API Changes Detected
+
+The OpenAPI specification has breaking changes compared to the baseline.
+
+<details>
+<summary>Breaking Changes Report</summary>
+
+\`\`\`
+${breakingChanges}
+\`\`\`
+
+</details>
+
+### If this is intentional:
+
+1. **Bump API version**: Update from v1 → v2 in affected endpoints
+2. **Update locked spec**: Run \`./scripts/lock-openapi.sh\` and commit the result
+3. **Document migration**: Add a migration guide in the PR description
+4. **Update frontend**: Notify frontend team of breaking changes
+
+### If this is unintentional:
+
+Review the changes and fix backward compatibility issues before merging.
+
+---
+**Note**: This check prevents accidental breaking changes. Intentional breaking changes are allowed with proper versioning and documentation.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Upload spec artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-specs
+          path: |
+            /tmp/baseline-spec.yaml
+            /tmp/current-spec.yaml
+            /tmp/breaking-changes.txt
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd ../
+          docker-compose down -v
+
+      - name: Fail if breaking changes
+        if: steps.breaking_changes.outputs.has_breaking_changes == 'true'
+        run: |
+          echo "❌ Breaking API changes detected. See PR comment for details."
+          exit 1

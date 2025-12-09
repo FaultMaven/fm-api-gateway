@@ -62,7 +62,6 @@ def create_app() -> FastAPI:
         "session": settings.get_service_url("session"),
         "case": settings.get_service_url("case"),
         "evidence": settings.get_service_url("evidence"),
-        "investigation": settings.get_service_url("investigation"),
         "knowledge": settings.get_service_url("knowledge"),
         "agent": settings.get_service_url("agent"),
     })
@@ -120,6 +119,48 @@ def create_app() -> FastAPI:
             openapi_url="/openapi.json",
             title="FaultMaven API - Unified Documentation",
         )
+
+    # Admin endpoints for OpenAPI management
+    @app.post("/admin/refresh-openapi", include_in_schema=False)
+    async def refresh_openapi_cache():
+        """
+        Force refresh of OpenAPI spec cache (admin only).
+
+        Use this endpoint after deploying a service update to immediately
+        refresh the unified OpenAPI spec without waiting for cache expiry.
+
+        Returns:
+            Status message confirming cache was cleared
+        """
+        aggregator.clear_cache()
+        logger.info("OpenAPI spec cache cleared via admin endpoint")
+        return {
+            "status": "success",
+            "message": "OpenAPI spec cache cleared. Next request will fetch fresh specs from all services."
+        }
+
+    @app.get("/admin/openapi-health", include_in_schema=False)
+    async def openapi_health():
+        """
+        Check which services are responding with OpenAPI specs.
+
+        Forces a fresh fetch from all services and returns aggregation metadata
+        showing which services succeeded and which failed.
+
+        Returns:
+            Aggregation metadata with service health status
+        """
+        spec = await aggregator.get_unified_spec(force_refresh=True)
+        metadata = spec["info"].get("x-aggregation-metadata", {})
+
+        logger.info(f"OpenAPI health check: {len(metadata.get('successful_services', []))} successful, "
+                   f"{len(metadata.get('failed_services', []))} failed")
+
+        return {
+            "status": "healthy" if not metadata.get("failed_services") else "degraded",
+            "timestamp": spec["info"].get("version", "unknown"),
+            "aggregation": metadata
+        }
 
     # Include health check route
     app.include_router(router)

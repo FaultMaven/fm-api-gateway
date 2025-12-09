@@ -1,0 +1,116 @@
+name: Generate Locked OpenAPI Spec on Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      gateway_url:
+        description: 'API Gateway URL'
+        required: false
+        default: 'http://localhost:8090'
+
+jobs:
+  lock-openapi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install httpx pyyaml
+
+      - name: Start services
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          cd ../
+          docker-compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 45
+
+      - name: Wait for API Gateway health
+        run: |
+          GATEWAY_URL="${{ github.event.inputs.gateway_url || 'http://localhost:8090' }}"
+
+          max_attempts=30
+          attempt=0
+          until curl -sf ${GATEWAY_URL}/health > /dev/null 2>&1; do
+            attempt=$((attempt + 1))
+            if [ $attempt -ge $max_attempts ]; then
+              echo "API Gateway failed to become healthy after $max_attempts attempts"
+              if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+                docker-compose logs fm-api-gateway
+              fi
+              exit 1
+            fi
+            echo "Waiting for API Gateway... (attempt $attempt/$max_attempts)"
+            sleep 2
+          done
+          echo "API Gateway is healthy at ${GATEWAY_URL}"
+
+      - name: Generate locked OpenAPI spec
+        run: |
+          GATEWAY_URL="${{ github.event.inputs.gateway_url || 'http://localhost:8090' }}"
+
+          echo "Generating locked spec from ${GATEWAY_URL}..."
+          python3 scripts/lock_openapi.py \
+            --gateway-url ${GATEWAY_URL} \
+            --output docs/api/openapi.locked.yaml \
+            --format yaml
+
+      - name: Get release version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="manual-$(date +%Y%m%d-%H%M%S)"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Commit and push locked spec
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add docs/api/openapi.locked.yaml
+
+          if git diff --staged --quiet; then
+            echo "No changes to locked spec"
+          else
+            git commit -m "docs: update locked OpenAPI spec for ${{ steps.version.outputs.version }}"
+            git push
+            echo "✓ Locked spec updated and committed"
+          fi
+
+      - name: Create spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-locked-${{ steps.version.outputs.version }}
+          path: docs/api/openapi.locked.yaml
+          retention-days: 90
+
+      - name: Cleanup
+        if: always() && github.event_name != 'workflow_dispatch'
+        run: |
+          cd ../
+          docker-compose down -v
+
+      - name: Summary
+        run: |
+          echo "## ✅ Locked OpenAPI Spec Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**File**: docs/api/openapi.locked.yaml" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The locked spec has been committed to the repository." >> $GITHUB_STEP_SUMMARY
