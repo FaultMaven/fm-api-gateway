@@ -5,9 +5,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Copy fm-core-lib first (required dependency)
+COPY fm-core-lib/ ./fm-core-lib/
+RUN pip install --no-cache-dir ./fm-core-lib
+
 # Copy pyproject.toml and source code
-COPY pyproject.toml ./
-COPY src/ ./src/
+COPY fm-api-gateway/pyproject.toml ./
+COPY fm-api-gateway/src/ ./src/
 
 # Install dependencies
 RUN pip install --no-cache-dir -e .

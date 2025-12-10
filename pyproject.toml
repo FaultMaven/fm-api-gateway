@@ -15,7 +15,7 @@ dependencies = [
     # Redis for rate limiting and circuit breakers
     "redis>=5.0.0",
     # FaultMaven Core Library (service discovery, shared models)
-    "fm-core-lib @ git+https://github.com/FaultMaven/fm-core-lib.git@main",
+    "fm-core-lib",
 ]
 
 [project.optional-dependencies]

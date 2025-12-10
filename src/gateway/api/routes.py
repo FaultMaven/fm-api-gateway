@@ -7,19 +7,24 @@ from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from ..core.circuit_breaker import get_circuit_breaker
+from ..core.health_checker import get_health_checker
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Initialize circuit breaker
+# Initialize circuit breaker and health checker
 circuit_breaker = get_circuit_breaker()
+health_checker = get_health_checker()
 
 
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """
-    Health check endpoint.
+    Basic health check endpoint (liveness probe).
+
+    This is a lightweight check that only verifies the Gateway
+    process is running. Use /health/live for K8s liveness probes.
 
     Returns:
         Gateway health status
@@ -29,6 +34,47 @@ async def health_check() -> Dict[str, Any]:
         "service": "fm-api-gateway",
         "version": "1.0.0",
     }
+
+
+@router.get("/health/live")
+async def liveness_probe() -> Dict[str, Any]:
+    """
+    Kubernetes liveness probe endpoint.
+
+    Checks if the Gateway process is alive and responsive.
+    K8s will restart the pod if this fails.
+
+    Returns:
+        Liveness status (200 = alive, 503 = dead)
+    """
+    health = await health_checker.check_liveness()
+    return health.to_dict()
+
+
+@router.get("/health/ready")
+async def readiness_probe() -> Response:
+    """
+    Kubernetes readiness probe endpoint.
+
+    Performs deep validation to determine if Gateway can handle traffic:
+    - Redis connectivity (for distributed rate limiting)
+    - Circuit breaker states (backend service health)
+    - Service registry initialization
+
+    K8s removes pods from load balancer if this returns 503.
+
+    Returns:
+        200 if ready, 503 if not ready
+    """
+    health = await health_checker.check_readiness()
+
+    # Return 503 if not ready (K8s will remove from service)
+    status_code = status.HTTP_200_OK if health.ready else status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return JSONResponse(
+        status_code=status_code,
+        content=health.to_dict(),
+    )
 
 
 async def proxy_request(
