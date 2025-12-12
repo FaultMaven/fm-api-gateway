@@ -91,7 +91,15 @@ jobs:
 
       - name: Run tests
         run: |
+          set +e
           pytest --maxfail=1 --disable-warnings -q
+          code=$?
+          # pytest exit code 5 == "no tests collected" (acceptable for now; smoke is the gate)
+          if [ "$code" -eq 5 ]; then
+            echo "No tests collected; smoke test is the primary gate for now."
+            exit 0
+          fi
+          exit "$code"
 
   smoke:
     name: Smoke test
@@ -117,16 +125,27 @@ jobs:
           docker run -d --rm --name smoke-${{ github.sha }} --network smoke-net -p 8000:8000 \
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
+          passed=false
           for i in {1..30}; do
             if curl -sf http://localhost:8000/health; then
               echo "✓ Health check passed"
+              passed=true
               break
             fi
             sleep 2
           done
 
+          if [ "$passed" != "true" ]; then
+            echo "✗ Health check failed"
+            docker logs smoke-${{ github.sha }} || true
+          fi
+
           docker stop smoke-${{ github.sha }}
           docker network rm smoke-net
+
+          if [ "$passed" != "true" ]; then
+            exit 1
+          fi
 
   push-to-registry:
     name: Push image to GHCR
