@@ -1,14 +1,19 @@
-name: Docker Build and Publish
+name: Docker Build and Publish (LEGACY - MANUAL ONLY)
+
+# DEPRECATED: Do not use for routine releases.
+# This workflow bypasses the hardened CI/CD pipeline in ci.yml.
+# Use ci.yml which gates all registry pushes on unit tests + smoke tests.
+#
+# This workflow is kept for emergency scenarios only.
+# Trigger manually via workflow_dispatch if needed.
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*.*.*'
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual publish (required)'
+        required: true
+        type: string
 
 env:
   DOCKER_IMAGE: faultmaven/fm-api-gateway
