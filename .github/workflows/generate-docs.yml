@@ -46,8 +46,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pyyaml
+          # Install fm-core-lib from GitHub (required by gateway imports)
+          pip install git+https://github.com/FaultMaven/fm-core-lib.git@main
+          # Install service dependencies
+          pip install fastapi uvicorn pydantic pydantic-settings python-dotenv pyyaml redis httpx
+          # Install package in editable mode
+          pip install --no-deps -e .
 
       - name: Generate OpenAPI Specification
         run: |
@@ -217,7 +221,7 @@ jobs:
           reviewers: ${{ github.actor }}
 
       - name: Upload OpenAPI spec as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openapi-spec
           path: docs/api/
