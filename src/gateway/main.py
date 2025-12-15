@@ -99,12 +99,53 @@ def create_app() -> FastAPI:
     # Add custom OpenAPI endpoints
     @app.get("/openapi.json", include_in_schema=False)
     async def get_unified_openapi():
-        """Get unified OpenAPI specification from all microservices"""
+        """
+        Get unified OpenAPI specification from all microservices.
+
+        This endpoint aggregates OpenAPI specs from all backend services
+        (auth, session, case, evidence, knowledge, agent) into a single
+        unified specification. The specs are cached and automatically
+        refreshed based on TTL settings.
+
+        The unified spec includes:
+        - All endpoints from all microservices
+        - Consistent authentication requirements
+        - Aggregated model definitions (with conflict resolution)
+        - Metadata about which services were successfully fetched
+
+        Use /admin/refresh-openapi to force a cache refresh after deploying
+        service updates.
+
+        Returns:
+            OpenAPI 3.x specification (JSON) with aggregated endpoints from
+            all FaultMaven microservices, including x-aggregation-metadata
+            showing which services succeeded/failed during aggregation.
+        """
         return await aggregator.get_unified_spec()
 
     @app.get("/docs", include_in_schema=False)
     async def get_unified_docs():
-        """Swagger UI for unified API documentation"""
+        """
+        Swagger UI for unified API documentation.
+
+        Interactive API documentation using Swagger UI that displays all
+        endpoints from all FaultMaven microservices in a single interface.
+        This provides a comprehensive view of the entire FaultMaven API
+        surface without needing to navigate to individual service docs.
+
+        Features:
+        - Try-it-out functionality for testing endpoints
+        - Request/response examples
+        - Schema definitions for all models
+        - Authentication configuration
+
+        The documentation is automatically generated from the unified OpenAPI
+        spec at /openapi.json and updates when services are deployed.
+
+        Returns:
+            Swagger UI HTML page displaying unified API documentation for all
+            FaultMaven services (auth, sessions, cases, evidence, knowledge, agent).
+        """
         from fastapi.openapi.docs import get_swagger_ui_html
         return get_swagger_ui_html(
             openapi_url="/openapi.json",
@@ -113,7 +154,27 @@ def create_app() -> FastAPI:
 
     @app.get("/redoc", include_in_schema=False)
     async def get_unified_redoc():
-        """ReDoc UI for unified API documentation"""
+        """
+        ReDoc UI for unified API documentation.
+
+        Alternative API documentation interface using ReDoc that displays all
+        endpoints from all FaultMaven microservices. ReDoc provides a clean,
+        three-panel layout optimized for reading and navigating large API specs.
+
+        Features:
+        - Clean, responsive design
+        - Fast search across all endpoints
+        - Expandable request/response schemas
+        - Download OpenAPI spec button
+        - Deep linking to specific endpoints
+
+        The documentation is automatically generated from the unified OpenAPI
+        spec at /openapi.json and updates when services are deployed.
+
+        Returns:
+            ReDoc HTML page displaying unified API documentation for all
+            FaultMaven services with a clean, reader-friendly interface.
+        """
         from fastapi.openapi.docs import get_redoc_html
         return get_redoc_html(
             openapi_url="/openapi.json",
