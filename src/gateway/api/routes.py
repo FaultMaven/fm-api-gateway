@@ -21,13 +21,35 @@ health_checker = get_health_checker()
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """
-    Basic health check endpoint (liveness probe).
+    Basic health check endpoint for API Gateway.
 
-    This is a lightweight check that only verifies the Gateway
-    process is running. Use /health/live for K8s liveness probes.
+    This is a lightweight check that only verifies the Gateway process is
+    running and responsive. It does not check backend service availability
+    or dependencies (Redis, circuit breakers, etc.).
+
+    Use this endpoint for:
+    - Quick status checks during development
+    - Simple uptime monitoring
+    - Load balancer health checks (if deep validation not needed)
+
+    For production Kubernetes deployments, prefer:
+    - /health/live for liveness probes (restart pod if fails)
+    - /health/ready for readiness probes (remove from load balancer if fails)
+
+    The readiness probe performs deep validation including Redis connectivity
+    and circuit breaker states, ensuring the Gateway can actually handle
+    traffic before marking it as ready.
 
     Returns:
-        Gateway health status
+        Dict with status="healthy", service name, and version number.
+        Always returns 200 OK unless the process is completely down.
+
+    Example Response:
+        {
+            "status": "healthy",
+            "service": "fm-api-gateway",
+            "version": "1.0.0"
+        }
     """
     return {
         "status": "healthy",
