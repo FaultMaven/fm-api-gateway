@@ -370,55 +370,55 @@ def _add_proxy_routes(app: FastAPI, settings) -> None:
             path="/api/v1/evidence",
         )
 
-    # Route: /api/v1/hypotheses/* -> fm-investigation-service
+    # Route: /api/v1/hypotheses/* -> fm-case-service
     @app.api_route(
         "/api/v1/hypotheses/{path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_hypotheses(request: Request, path: str):
-        """Proxy hypothesis requests to fm-investigation-service"""
+        """Proxy hypothesis requests to fm-case-service (hypotheses are part of cases)"""
         return await proxy_request(
             request,
-            backend_url=settings.get_service_url("investigation"),
+            backend_url=settings.get_service_url("case"),
             path=f"/api/v1/hypotheses/{path}",
         )
 
-    # Route: /api/v1/hypotheses (no path) -> fm-investigation-service
+    # Route: /api/v1/hypotheses (no path) -> fm-case-service
     @app.api_route(
         "/api/v1/hypotheses",
         methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_hypotheses_root(request: Request):
-        """Proxy hypothesis list/create requests to fm-investigation-service"""
+        """Proxy hypothesis list/create requests to fm-case-service (hypotheses are part of cases)"""
         return await proxy_request(
             request,
-            backend_url=settings.get_service_url("investigation"),
+            backend_url=settings.get_service_url("case"),
             path="/api/v1/hypotheses",
         )
 
-    # Route: /api/v1/solutions/* -> fm-investigation-service
+    # Route: /api/v1/solutions/* -> fm-case-service
     @app.api_route(
         "/api/v1/solutions/{path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     )
     async def proxy_solutions(request: Request, path: str):
-        """Proxy solution requests to fm-investigation-service"""
+        """Proxy solution requests to fm-case-service (solutions are part of cases)"""
         return await proxy_request(
             request,
-            backend_url=settings.get_service_url("investigation"),
+            backend_url=settings.get_service_url("case"),
             path=f"/api/v1/solutions/{path}",
         )
 
-    # Route: /api/v1/solutions (no path) -> fm-investigation-service
+    # Route: /api/v1/solutions (no path) -> fm-case-service
     @app.api_route(
         "/api/v1/solutions",
         methods=["GET", "POST", "OPTIONS"],
     )
     async def proxy_solutions_root(request: Request):
-        """Proxy solution list/create requests to fm-investigation-service"""
+        """Proxy solution requests to fm-case-service (solutions are part of cases)"""
         return await proxy_request(
             request,
-            backend_url=settings.get_service_url("investigation"),
+            backend_url=settings.get_service_url("case"),
             path="/api/v1/solutions",
         )
 

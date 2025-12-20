@@ -50,10 +50,6 @@ class Settings(BaseSettings):
         default=None,
         description="Override URL for fm-evidence-service (legacy)",
     )
-    fm_investigation_service_url: Optional[str] = Field(
-        default=None,
-        description="Override URL for fm-investigation-service (legacy)",
-    )
     fm_knowledge_service_url: Optional[str] = Field(
         default=None,
         description="Override URL for fm-knowledge-service (legacy)",

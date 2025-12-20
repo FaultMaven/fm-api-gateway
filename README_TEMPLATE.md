@@ -82,13 +82,13 @@ The Gateway proxies requests to backend microservices:
 
 | Route Pattern | Backend Service | Port | Description |
 |---------------|-----------------|------|-------------|
-| `/api/v1/auth/*` | fm-auth-service | 8000 | Authentication and authorization |
-| `/api/v1/sessions/*` | fm-session-service | 8001 | Investigation session management |
+| `/api/v1/auth/*` | fm-auth-service | 8001 | Authentication and authorization |
+| `/api/v1/sessions/*` | fm-session-service | 8002 | Investigation session management |
 | `/api/v1/cases/*` | fm-case-service | 8003 | Case lifecycle management |
-| `/api/v1/evidence/*` | fm-evidence-service | 8004 | Evidence artifact storage |
-| `/api/v1/hypotheses/*` | fm-investigation-service | 8005 | Hypothesis tracking |
-| `/api/v1/solutions/*` | fm-investigation-service | 8005 | Solution management |
-| `/api/v1/knowledge/*` | fm-knowledge-service | 8002 | Knowledge base and recommendations |
+| `/api/v1/hypotheses/*` | fm-case-service | 8003 | Hypothesis tracking (part of cases) |
+| `/api/v1/solutions/*` | fm-case-service | 8003 | Solution management (part of cases) |
+| `/api/v1/knowledge/*` | fm-knowledge-service | 8004 | Knowledge base and recommendations |
+| `/api/v1/evidence/*` | fm-evidence-service | 8005 | Evidence artifact storage |
 | `/api/v1/agent/*` | fm-agent-service | 8006 | AI agent orchestration |
 
 **Example Request Flow:**
@@ -118,12 +118,11 @@ Configuration via environment variables:
 | `PRIMARY_AUTH_PROVIDER` | Auth provider (fm-auth-service/supabase/auth0) | `fm-auth-service` |
 | `GATEWAY_HOST` | Gateway bind host | `0.0.0.0` |
 | `GATEWAY_PORT` | Gateway bind port | `8000` |
-| `FM_AUTH_SERVICE_URL` | fm-auth-service URL | `http://localhost:8000` |
-| `FM_SESSION_SERVICE_URL` | fm-session-service URL | `http://localhost:8001` |
-| `FM_KNOWLEDGE_SERVICE_URL` | fm-knowledge-service URL | `http://localhost:8002` |
+| `FM_AUTH_SERVICE_URL` | fm-auth-service URL | `http://localhost:8001` |
+| `FM_SESSION_SERVICE_URL` | fm-session-service URL | `http://localhost:8002` |
 | `FM_CASE_SERVICE_URL` | fm-case-service URL | `http://localhost:8003` |
-| `FM_EVIDENCE_SERVICE_URL` | fm-evidence-service URL | `http://localhost:8004` |
-| `FM_INVESTIGATION_SERVICE_URL` | fm-investigation-service URL | `http://localhost:8005` |
+| `FM_KNOWLEDGE_SERVICE_URL` | fm-knowledge-service URL | `http://localhost:8004` |
+| `FM_EVIDENCE_SERVICE_URL` | fm-evidence-service URL | `http://localhost:8005` |
 | `FM_AGENT_SERVICE_URL` | fm-agent-service URL | `http://localhost:8006` |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `*` |
 | `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | `INFO` |
@@ -270,12 +269,11 @@ readinessProbe:
                      ↓
 ┌─────────────────────────────────────────────────┐
 │  Backend Microservices (Ports 8000-8006)        │
-│  - fm-auth-service (8000)                       │
-│  - fm-session-service (8001)                    │
-│  - fm-knowledge-service (8002)                  │
+│  - fm-auth-service (8001)                       │
+│  - fm-session-service (8002)                    │
 │  - fm-case-service (8003)                       │
-│  - fm-evidence-service (8004)                   │
-│  - fm-investigation-service (8005)              │
+│  - fm-knowledge-service (8004)                  │
+│  - fm-evidence-service (8005)                   │
 │  - fm-agent-service (8006)                      │
 │                                                 │
 │  Trust X-User-* headers from Gateway            │
